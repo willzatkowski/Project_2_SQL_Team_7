@@ -1,0 +1,693 @@
+---
+title: "Force Plate Workflow"
+format: pdf
+author: "Group Members: Nick Katz & Will Zatkowski"
+---
+
+```{r setup}
+#| message: false
+#| warning: false
+#| include: false
+library(tidyverse)
+library(readr)
+library(knitr)
+library(mdsr)
+library(DBI)
+library(RMariaDB)
+library(dbplyr)
+library(duckdb) 
+```
+
+### ---------------------------------------------------------------------------
+# Accessing data
+
+```{r data loading and cleaning}
+#Loading - hawkinsr query for last 365 days of tests in KPI baseball players
+CMJ_raw_data <- read.csv("CMJ_Data.csv") 
+MR_raw_data <- read.csv("MultiRebound_Data.csv")
+SJ_raw_data <- read.csv("SJ_Data.csv")
+
+#Master athlete name / id file
+athletes <- CMJ_raw_data %>%
+  select(athlete_id, athlete_name) %>%
+  distinct()
+readr::write_csv(athletes, "athletes.csv")
+
+#Cleaning: 257 -> 34-87 vars 
+#In raw data, each dataset has columns for all jump types / tests. Each jump only has specific metrics and information, and this cleaning reduced all datasets to the jump-type specific variables, excluding all unrelated columns.
+
+CMJ_clean_data <- CMJ_raw_data[-c(3:4,7:9,12:16,99:257)]
+readr::write_csv(CMJ_clean_data, "CMJ_cleaned.csv")   
+
+SJ_clean_data <- SJ_raw_data[-c(3:4, 7:9,12:16,20:23,26,29,31:34,36:37,41,43:44,46,51:54,59,62,65,67,69,73,75:79,81,85:87,90,92,95,98:99,101:257)]
+readr::write_csv(SJ_clean_data, "SJ_cleaned.csv")
+
+MR_clean_data <- MR_raw_data[-c(3:4,7:9,12:67,69:100,129:257)]
+readr::write_csv(MR_clean_data, "MR_cleaned.csv")
+```
+
+
+
+
+### ---------------------------------------------------------------------------
+# Designing the database
+
+```{r Database creation and optimization}
+con_FP <- DBI::dbConnect(duckdb::duckdb(), dbdir = "Foce_PlateDB")
+```
+
+## Dropping Tables
+```{sql connection=con_FP}
+SHOW TABLES;
+DROP TABLE IF EXISTS CMJ_cleaned;
+DROP TABLE IF EXISTS MR_cleaned;
+DROP TABLE IF EXISTS SJ_cleaned;
+DROP TABLE IF EXISTS athletes;
+```
+
+## Creating athletes table
+```{sql connection=con_FP}
+CREATE TABLE athletes (
+athlete_id VARCHAR(255) PRIMARY KEY,
+athlete_name VARCHAR(255) NOT NULL);
+```
+
+```{sql connection=con_FP}
+COPY athletes FROM 'athletes.csv' (FORMAT CSV, HEADER, NULL 'NA');
+SELECT * FROM athletes LIMIT 5;
+```
+
+## creating CMJ table
+```{sql connection=con_FP}
+
+CREATE TABLE CMJ_cleaned (
+id VARCHAR(255) PRIMARY KEY,
+timestamp BIGINT,
+testType_name VARCHAR(255),
+testType_canonicalId VARCHAR(255),
+athlete_id VARCHAR(255),
+athlete_name VARCHAR(255),
+right_avg_propulsive_force_n DOUBLE DEFAULT NULL,
+relative_propulsive_net_impulse_n_s_kg DOUBLE DEFAULT NULL,
+propulsive_phase_s DOUBLE DEFAULT NULL,
+peak_relative_braking_force_percent DOUBLE DEFAULT NULL,
+impulse_ratio DOUBLE DEFAULT NULL,
+positive_impulse_n_s DOUBLE DEFAULT NULL,
+countermovement_depth_m DOUBLE DEFAULT NULL,
+left_force_at_peak_propulsive_force_n DOUBLE DEFAULT NULL,
+jump_height_m DOUBLE DEFAULT NULL,
+unweighting_phase_s DOUBLE DEFAULT NULL,
+relative_propulsive_impulse_n_s_kg DOUBLE DEFAULT NULL,
+landing_phase_s DOUBLE DEFAULT NULL,
+l_r_avg_braking_rfd_percent DOUBLE DEFAULT NULL,
+peak_relative_propulsive_power_w_kg DOUBLE DEFAULT NULL,
+stiffness_n_m DOUBLE DEFAULT NULL,
+avg_relative_braking_power_w_kg DOUBLE DEFAULT NULL,
+unweighting_phase_percent DOUBLE DEFAULT NULL,
+right_force_at_peak_braking_force_n DOUBLE DEFAULT NULL,
+landing_performance_index DOUBLE DEFAULT NULL,
+rsi DOUBLE DEFAULT NULL,
+right_avg_braking_force_n DOUBLE DEFAULT NULL,
+l_r_avg_propulsive_force_percent DOUBLE DEFAULT NULL,
+avg_relative_propulsive_force_percent DOUBLE DEFAULT NULL,
+left_avg_landing_force_n DOUBLE DEFAULT NULL,
+l_r_avg_braking_force_percent DOUBLE DEFAULT NULL,
+peak_propulsive_power_w DOUBLE DEFAULT NULL,
+force_at_min_displacement_n DOUBLE DEFAULT NULL,
+avg_braking_power_w DOUBLE DEFAULT NULL,
+peak_landing_force_n DOUBLE DEFAULT NULL,
+relative_braking_impulse_n_s_kg DOUBLE DEFAULT NULL,
+right_avg_landing_force_n DOUBLE DEFAULT NULL,
+avg_propulsive_force_n DOUBLE DEFAULT NULL,
+flight_time_s DOUBLE DEFAULT NULL,
+jump_momentum_kg_m_s DOUBLE DEFAULT NULL,
+relative_braking_net_impulse_n_s_kg DOUBLE DEFAULT NULL,
+peak_braking_force_n DOUBLE DEFAULT NULL,
+avg_braking_velocity_m_s DOUBLE DEFAULT NULL,
+left_avg_braking_force_n DOUBLE DEFAULT NULL,
+landing_height_m DOUBLE DEFAULT NULL,
+time_to_takeoff_s DOUBLE DEFAULT NULL,
+avg_propulsive_velocity_m_s DOUBLE DEFAULT NULL,
+takeoff_velocity_m_s DOUBLE DEFAULT NULL,
+l_r_peak_braking_force_percent DOUBLE DEFAULT NULL,
+time_to_stabilization_ms DOUBLE DEFAULT NULL,
+avg_propulsive_power_w DOUBLE DEFAULT NULL,
+right_avg_braking_rfd_n_s DOUBLE DEFAULT NULL,
+l_r_peak_propulsive_force_percent DOUBLE DEFAULT NULL,
+right_force_at_peak_propulsive_force_n DOUBLE DEFAULT NULL,
+avg_relative_braking_force_percent DOUBLE DEFAULT NULL,
+relative_peak_landing_force_percent DOUBLE DEFAULT NULL,
+peak_relative_braking_power_w_kg DOUBLE DEFAULT NULL,
+system_weight_n DOUBLE DEFAULT NULL,
+m_rsi DOUBLE DEFAULT NULL,
+peak_relative_propulsive_force_percent DOUBLE DEFAULT NULL,
+peak_velocity_m_s DOUBLE DEFAULT NULL,
+l_r_avg_landing_force_percent DOUBLE DEFAULT NULL,
+positive_net_impulse_n_s DOUBLE DEFAULT NULL,
+landing_stiffness_n_m DOUBLE DEFAULT NULL,
+relative_force_at_min_displacement_percent DOUBLE DEFAULT NULL,
+braking_net_impulse_n_s DOUBLE DEFAULT NULL,
+braking_phase_percent DOUBLE DEFAULT NULL,
+left_avg_braking_rfd_n_s DOUBLE DEFAULT NULL,
+propulsive_phase_percent DOUBLE DEFAULT NULL,
+avg_relative_propulsive_power_w_kg DOUBLE DEFAULT NULL,
+braking_impulse_n_s DOUBLE DEFAULT NULL,
+right_force_at_peak_landing_force_n DOUBLE DEFAULT NULL,
+propulsive_net_impulse_n_s DOUBLE DEFAULT NULL,
+l_r_peak_landing_force_percent DOUBLE DEFAULT NULL,
+peak_braking_power_w DOUBLE DEFAULT NULL,
+avg_braking_force_n DOUBLE DEFAULT NULL,
+braking_phase_s DOUBLE DEFAULT NULL,
+left_avg_propulsive_force_n DOUBLE DEFAULT NULL,
+avg_landing_force_n DOUBLE DEFAULT NULL,
+peak_braking_velocity_m_s DOUBLE DEFAULT NULL,
+peak_propulsive_force_n DOUBLE DEFAULT NULL,
+braking_rfd_n_s DOUBLE DEFAULT NULL,
+left_force_at_peak_landing_force_n DOUBLE DEFAULT NULL,
+l_r_propulsive_impulse_index_percent DOUBLE DEFAULT NULL,
+left_force_at_peak_braking_force_n DOUBLE DEFAULT NULL,
+l_r_landing_impulse_index_percent DOUBLE DEFAULT NULL,
+propulsive_impulse_n_s DOUBLE DEFAULT NULL,
+l_r_braking_impulse_index_percent DOUBLE DEFAULT NULL);
+
+```
+
+```{sql connection=con_FP}
+COPY CMJ_cleaned FROM 'CMJ_cleaned.csv' (FORMAT CSV, HEADER, NULL 'NA');
+```
+
+```{sql connection=con_FP}
+SHOW TABLES;
+SELECT * FROM CMJ_cleaned LIMIT 5;
+```
+
+## Will's work: MR and SJ tables
+```{sql connection=con_FP}
+
+CREATE TABLE MR_cleaned (
+id VARCHAR(255) PRIMARY KEY,
+timestamp BIGINT,
+testType_name VARCHAR(255),
+testType_canonicalId VARCHAR(255),
+athlete_id VARCHAR(255),
+athlete_name VARCHAR(255),
+system_weight_n DOUBLE DEFAULT NULL,
+top_3_jumps_avg_jump_height_m DOUBLE DEFAULT NULL,
+total_contact_time_s DOUBLE DEFAULT NULL,
+top_5_jumps_avg_jump_height_m DOUBLE DEFAULT NULL,
+top_5_jumps_avg_m_rsi DOUBLE DEFAULT NULL,
+number_of_jumps_count DOUBLE DEFAULT NULL,
+top_3_jumps_avg_m_rsi DOUBLE DEFAULT NULL,
+top_5_jumps_peak_m_rsi DOUBLE DEFAULT NULL,
+top_5_jumps_avg_rsi DOUBLE DEFAULT NULL,
+l_r_avg_force_percent DOUBLE DEFAULT NULL,
+top_3_jumps_peak_rsi DOUBLE DEFAULT NULL,
+top_3_jumps_peak_m_rsi DOUBLE DEFAULT NULL,
+top_5_jumps_peak_rsi DOUBLE DEFAULT NULL,
+peak_jump_m_rsi DOUBLE DEFAULT NULL,
+avg_contact_time_s DOUBLE DEFAULT NULL,
+top_3_jumps_avg_rsi DOUBLE DEFAULT NULL,
+peak_jump_rsi DOUBLE DEFAULT NULL,
+avg_rsi DOUBLE DEFAULT NULL,
+avg_jump_height_m DOUBLE DEFAULT NULL,
+peak_force_n DOUBLE DEFAULT NULL,
+avg_m_rsi DOUBLE DEFAULT NULL,
+top_3_jumps_avg_contact_time_s DOUBLE DEFAULT NULL,
+l_r_peak_force_percent DOUBLE DEFAULT NULL,
+peak_jump_height_m DOUBLE DEFAULT NULL,
+top_5_jumps_avg_contact_time_s DOUBLE DEFAULT NULL,
+peak_rsi DOUBLE DEFAULT NULL,
+total_flight_time_s DOUBLE DEFAULT NULL,
+avg_force_n DOUBLE DEFAULT NULL,
+peak_m_rsi DOUBLE DEFAULT NULL);
+
+```
+
+```{sql connection=con_FP}
+COPY MR_cleaned FROM 'MR_cleaned.csv' (FORMAT CSV, HEADER, NULL 'NA');
+```
+
+
+```{sql connection=con_FP}
+SHOW TABLES;
+SELECT * FROM MR_cleaned LIMIT 5;
+```
+
+```{sql connection=con_FP}
+
+CREATE TABLE SJ_cleaned (
+id VARCHAR(255) PRIMARY KEY,
+timestamp BIGINT,
+testType_name VARCHAR(255),
+testType_canonicalId VARCHAR(255),
+athlete_id VARCHAR(255),
+athlete_name VARCHAR(255),
+right_avg_propulsive_force_n DOUBLE DEFAULT NULL,
+relative_propulsive_net_impulse_n_s_kg DOUBLE DEFAULT NULL,
+propulsive_phase_s DOUBLE DEFAULT NULL,
+left_force_at_peak_propulsive_force_n DOUBLE DEFAULT NULL,
+jump_height_m DOUBLE DEFAULT NULL,
+relative_propulsive_impulse_n_s_kg DOUBLE DEFAULT NULL,
+landing_phase_s DOUBLE DEFAULT NULL,
+peak_relative_propulsive_power_w_kg DOUBLE DEFAULT NULL,
+landing_performance_index DOUBLE DEFAULT NULL,
+l_r_avg_propulsive_force_percent DOUBLE DEFAULT NULL,
+avg_relative_propulsive_force_percent DOUBLE DEFAULT NULL,
+left_avg_landing_force_n DOUBLE DEFAULT NULL,
+peak_propulsive_power_w DOUBLE DEFAULT NULL,
+peak_landing_force_n DOUBLE DEFAULT NULL,
+right_avg_landing_force_n DOUBLE DEFAULT NULL,
+avg_propulsive_force_n DOUBLE DEFAULT NULL,
+flight_time_s DOUBLE DEFAULT NULL,
+jump_momentum_kg_m_s DOUBLE DEFAULT NULL,
+landing_height_m DOUBLE DEFAULT NULL,
+time_to_takeoff_s DOUBLE DEFAULT NULL,
+avg_propulsive_velocity_m_s DOUBLE DEFAULT NULL,
+takeoff_velocity_m_s DOUBLE DEFAULT NULL,
+time_to_stabilization_ms DOUBLE DEFAULT NULL,
+avg_propulsive_power_w DOUBLE DEFAULT NULL,
+l_r_peak_propulsive_force_percent DOUBLE DEFAULT NULL,
+right_force_at_peak_propulsive_force_n DOUBLE DEFAULT NULL,
+relative_peak_landing_force_percent DOUBLE DEFAULT NULL,
+system_weight_n DOUBLE DEFAULT NULL,
+peak_relative_propulsive_force_percent DOUBLE DEFAULT NULL,
+peak_velocity_m_s DOUBLE DEFAULT NULL,
+l_r_avg_landing_force_percent DOUBLE DEFAULT NULL,
+landing_stiffness_n_m DOUBLE DEFAULT NULL,
+avg_relative_propulsive_power_w_kg DOUBLE DEFAULT NULL,
+right_force_at_peak_landing_force_n DOUBLE DEFAULT NULL,
+propulsive_net_impulse_n_s DOUBLE DEFAULT NULL,
+l_r_peak_landing_force_percent DOUBLE DEFAULT NULL,
+left_avg_propulsive_force_n DOUBLE DEFAULT NULL,
+avg_landing_force_n DOUBLE DEFAULT NULL,
+peak_propuslive_force_n DOUBLE DEFAULT NULL,
+left_force_at_peak_landing_force_n DOUBLE DEFAULT NULL,
+l_r_propulsive_impulse_index_percent DOUBLE DEFAULT NULL,
+l_r_landing_impulse_index_percent DOUBLE DEFAULT NULL,
+propulsive_impulse_n_s DOUBLE DEFAULT NULL,
+propulsive_rfd_n_s DOUBLE DEFAULT NULL);
+```
+
+```{sql connection=con_FP}
+COPY SJ_cleaned FROM 'SJ_cleaned.csv' (FORMAT CSV, HEADER, NULL 'NA');
+```
+
+```{sql connection=con_FP}
+SHOW TABLES;
+SELECT * FROM SJ_cleaned LIMIT 5;
+```
+
+
+### ---------------------------------------------------------------------------
+# Querying data using SQL
+
+## Query 1: Who are our fastest movers? (Nick)
+top 10 athletes for CMJ and SJ in takeoff velocity (takeoff_velocity_m_s) and time to takeoff (time_to_takeoff_s). These metrics give us a good idea of the fastest movers in the acceleration (propulsion) phase of both SJ and CMJ. the takeoff time offers the fastest movers in the global range of the full jump, isolating the fastest movers who get off the ground quickly. We are going to include jump_height as a general performance metric to see how much speed influences jump height in both types of jumps. 
+
+**Workflow**
+- Select: 3 metrics in question + athlete name and test type
+- using UNION, so two identical queries for SJ and CMJ tables
+- grouped by athlete and test type: looking at best metric for individual within jump type
+- HAVING: to ensure no one off outliers, >20 total tests needed for qualification 
+- ORDER: chose main outcome (jump height) to order the data
+```{sql connection=con_FP}
+#| output.var: "Speed_query_df"
+
+(SELECT athlete_name, MAX(takeoff_velocity_m_s) AS Best_takeoff_velocity, MIN(time_to_takeoff_s) AS best_takeoff_time, MAX(jump_height_m) AS best_jump_height, testType_name AS Test_type
+FROM CMJ_cleaned
+GROUP BY athlete_name, Test_type
+HAVING COUNT(*) > 20)
+UNION
+(SELECT athlete_name, MAX(takeoff_velocity_m_s) AS Best_takeoff_velocity, MIN(time_to_takeoff_s) AS best_takeoff_time, MAX(jump_height_m) AS best_jump_height, testType_name AS Test_type
+FROM SJ_cleaned
+GROUP BY athlete_name, Test_type
+HAVING COUNT(*) > 20)
+ORDER BY best_jump_height DESC;
+```
+```{r Checking new DF}
+glimpse(Speed_query_df)
+```
+
+## Query 2: Propulsive Phase data
+The goal here is to target the relevant propulsive phase metrics. This phase involves the acceleration from the lowest point in the jump. This phase involves the athlete pushing off of the ground to create vertical force and propel themselves into flight. Its relevant to the ability to create force and transfer it into a jump, which in sports like baseball is essantial for the short-burst activities like batting and pitching. Isolating these metrics in  two different jumps, the SJ and CMJ, can tell us a bit about an athletes tendencies in two different positions. The SJ starts in a lowered position, so the propulsive phase is morew isolated and requires intrinsic generation of force. The CMJ, on the other hand, begins fully standing and the propulsive phase occurs after a drop down (braking phase) movement. This puts the jumps in different movement categories, so comparing propulsive phase metrics can give us some unique insights.
+**Workflow**
+SELECT: both cmj and sj metrics, and athlete table ids
+LEFT JOIN: used two left join statements to average each tables metrics and group by athlete
+WHERE: ensured no non-tests / athletes who do not have data
+
+```{sql connection=con_FP}
+#| output.var: "Propulsive_combined"
+SELECT a.athlete_name, a.athlete_id,
+cmj.avg_cmj_relative_propulsive_impulse,
+cmj.avg_cmj_propulsive_time,
+cmj.avg_cmj_jump_height,
+cmj.avg_cmj_propulsive_force,
+cmj.avg_cmj_propulsive_velocity,
+cmj.avg_cmj_propulsive_power,
+sj.avg_sj_relative_propulsive_impulse,
+sj.avg_sj_propulsive_time,
+sj.avg_sj_jump_height,
+sj.avg_sj_propulsive_force,
+sj.avg_sj_propulsive_velocity,
+sj.avg_sj_propulsive_power
+FROM athletes AS a
+LEFT JOIN (
+  SELECT athlete_id, athlete_name,
+    AVG(relative_propulsive_net_impulse_n_s_kg) AS avg_cmj_relative_propulsive_impulse,
+    AVG(propulsive_phase_s) AS avg_cmj_propulsive_time,
+    AVG(jump_height_m) AS avg_cmj_jump_height,
+    AVG(avg_propulsive_force_n) AS avg_cmj_propulsive_force,
+    AVG(avg_propulsive_velocity_m_s) AS avg_cmj_propulsive_velocity,
+    AVG(avg_propulsive_power_w) AS avg_cmj_propulsive_power
+  FROM CMJ_cleaned
+  GROUP BY athlete_id, athlete_name 
+  HAVING COUNT(*) > 10)
+AS cmj ON a.athlete_id = cmj.athlete_id
+LEFT JOIN (
+  SELECT athlete_id, athlete_name,
+    AVG(relative_propulsive_net_impulse_n_s_kg) AS avg_sj_relative_propulsive_impulse,
+    AVG(propulsive_phase_s) AS avg_sj_propulsive_time,
+    AVG(jump_height_m) AS avg_sj_jump_height,
+    AVG(avg_propulsive_force_n) AS avg_sj_propulsive_force,
+    AVG(avg_propulsive_velocity_m_s) AS avg_sj_propulsive_velocity,
+    AVG(avg_propulsive_power_w) AS avg_sj_propulsive_power
+  FROM SJ_cleaned
+  GROUP BY athlete_id, athlete_name
+  HAVING COUNT(*) > 10)
+AS sj ON a.athlete_id = sj.athlete_id
+WHERE cmj.athlete_id IS NOT NULL AND sj.athlete_id IS NOT NULL;
+
+```
+
+```{r Checking second query}
+head(Propulsive_combined)
+write_csv(Propulsive_combined, "Propulsive_Phase_Data.csv")
+```
+
+## Query 3: GCT and Landing data
+For this query, I looked to target some general ground contact time (GCT) metrics. Accessing the multi-rebound table, I took three main metrics; average contact time, rsi (reactive strength index), and jump height. This test consists of 10 consecutive jumps in a row, trying to minimize GCT and maximize jump height. It is a great test for "rebound" ability, with the multiple jumps testing the athlete's ability to sustain power output and overall velocity. RSI is a calculation of flight time and GCT, and is regarded as the best relational variable for reactive jump tests. Within the counter-movement jump, the landing phase can give us insight into the elasticity of the athlete and the ability to produce force in repeat, with landing index and time to stabilization as our key variables. The goal of this dataset is to invesitgate the relationship between CMJ landing and MR general reactive strength. 
+
+```{sql connection=con_FP}
+#| output.var: "Rebound_Landing_combined"
+SELECT a.athlete_name, a.athlete_id,
+mr.avg_mr_contact_time,
+mr.avg_mr_rsi,
+mr.avg_mr_jump_height,
+cmj.avg_cmj_landing_performance_index,
+cmj.avg_cmj_time_to_stabilization
+FROM athletes AS a
+LEFT JOIN (
+  SELECT athlete_id, athlete_name,
+    AVG(avg_contact_time_s) AS avg_mr_contact_time,
+    AVG(avg_rsi) AS avg_mr_rsi,
+    AVG(avg_jump_height_m) AS avg_mr_jump_height
+  FROM MR_cleaned
+  GROUP BY athlete_id, athlete_name
+  HAVING COUNT(*) > 5)
+AS mr ON a.athlete_id = mr.athlete_id
+LEFT JOIN (
+  SELECT athlete_id, athlete_name,
+    AVG(time_to_stabilization_ms) AS avg_cmj_time_to_stabilization,
+    AVG(landing_performance_index) AS avg_cmj_landing_performance_index
+  FROM CMJ_cleaned
+  GROUP BY athlete_id, athlete_name
+  HAVING COUNT (*) > 10)
+AS cmj ON a.athlete_id = cmj.athlete_id
+WHERE mr.athlete_id IS NOT NULL;
+```
+
+```{r Checking second query}
+head(Rebound_Landing_combined)
+write_csv(Rebound_Landing_combined, "Rebound_Landing_data.csv")
+```
+
+## Query 4: Asymmetry report with CASE
+This query examined the asymmetrical properties of two key phases of the CMJ. To better understand the imbalances within our athletes, I used a CASE WHEN statement to create various asymmetry_report tags, labeling athletes as balanced or at different levels of risk. These thresholds, including a 15% and 12% difference between right and left respectively, were based on the general literature surrounding the ratio of L/R differences and their damaging effects on performance and injury prevalence. This  query's data is going to be used in the main viz.
+
+```{sql connection=con_FP}
+#| output.var: "Asymmetry_Grade"
+SELECT athlete_id, athlete_name,
+  AVG(ABS(l_r_avg_propulsive_force_percent)) AS avg_propulsive_CMJ_imbalance,
+  AVG(ABS(l_r_avg_braking_force_percent)) AS avg_braking_CMJ_imbalance,
+CASE
+  WHEN AVG(ABS(l_r_avg_propulsive_force_percent)) > 15 OR
+  AVG(ABS(l_r_avg_braking_force_percent)) > 15 THEN 'High risk: Check in'
+  WHEN AVG(ABS(l_r_avg_propulsive_force_percent))  > 12 OR
+  AVG(ABS(l_r_avg_braking_force_percent)) >12 THEN 'imbalanced: monitor'
+  WHEN AVG(ABS(l_r_avg_propulsive_force_percent))  < 12 OR
+  AVG(ABS(l_r_avg_braking_force_percent)) < 12 THEN 'balanced'
+  ELSE ' '
+  END AS asymmetry_report
+  FROM CMJ_cleaned
+  GROUP BY athlete_id, athlete_name
+  HAVING COUNT(*) > 10;
+  
+```
+
+```{r Checking second query}
+head(Asymmetry_Grade)
+write_csv(Asymmetry_Grade, "Asymmetry_grading.csv")
+```
+
+
+
+## Query 1: (Will)
+
+This query will take the left and right leg variables from both the CMJ and SJ tables and combine them to produce one dataset that can be used to compare the left and right legs. The dataset also has a metric (jump_height) to comapare performance to.
+
+```{sql connection=con_FP}
+#| output.var: "Left_Right_combined"
+
+SELECT a.athlete_name, a.athlete_id, sj.jump_height,
+cmj.cmj_right_avg_propulsive_force_n, 
+cmj.cmj_right_avg_landing_force_n, 
+cmj.cmj_right_force_at_peak_propulsive_force_n, 
+cmj.cmj_right_force_at_peak_landing_force_n, 
+
+sj.sj_right_avg_propulsive_force_n,
+sj.sj_right_avg_landing_force_n,
+sj.sj_right_force_at_peak_landing_force_n,
+sj.sj_right_force_at_peak_propulsive_force_n,
+
+cmj.cmj_left_avg_propulsive_force_n, 
+cmj.cmj_left_avg_landing_force_n, 
+cmj.cmj_left_force_at_peak_propulsive_force_n, 
+cmj.cmj_left_force_at_peak_landing_force_n, 
+
+sj.sj_left_avg_propulsive_force_n,
+sj.sj_left_avg_landing_force_n,
+sj.sj_left_force_at_peak_landing_force_n,
+sj.sj_left_force_at_peak_propulsive_force_n
+
+FROM athletes AS a
+LEFT JOIN (
+  SELECT athlete_name, athlete_id,
+    AVG(right_avg_propulsive_force_n) AS cmj_right_avg_propulsive_force_n, 
+    AVG(right_avg_landing_force_n) AS cmj_right_avg_landing_force_n, 
+    AVG(right_force_at_peak_propulsive_force_n) AS cmj_right_force_at_peak_propulsive_force_n, 
+    AVG(right_force_at_peak_landing_force_n) AS cmj_right_force_at_peak_landing_force_n, 
+    AVG(left_avg_propulsive_force_n) AS cmj_left_avg_propulsive_force_n, 
+    AVG(left_avg_landing_force_n) AS cmj_left_avg_landing_force_n,
+    AVG(left_force_at_peak_propulsive_force_n) AS cmj_left_force_at_peak_propulsive_force_n,
+    AVG(left_force_at_peak_landing_force_n) AS cmj_left_force_at_peak_landing_force_n
+  FROM CMJ_cleaned
+  GROUP BY athlete_id, athlete_name)
+AS cmj ON a.athlete_id = cmj.athlete_id
+LEFT JOIN(
+  SELECT athlete_name, athlete_id,
+    AVG(right_avg_propulsive_force_n) AS sj_right_avg_propulsive_force_n, 
+    AVG(right_avg_landing_force_n) AS sj_right_avg_landing_force_n, 
+    AVG(right_force_at_peak_propulsive_force_n) AS sj_right_force_at_peak_propulsive_force_n, 
+    AVG(right_force_at_peak_landing_force_n) AS sj_right_force_at_peak_landing_force_n, 
+    AVG(left_avg_propulsive_force_n) AS sj_left_avg_propulsive_force_n, 
+    AVG(left_avg_landing_force_n) AS sj_left_avg_landing_force_n,
+    AVG(left_force_at_peak_propulsive_force_n) AS sj_left_force_at_peak_propulsive_force_n,
+    AVG(left_force_at_peak_landing_force_n) AS sj_left_force_at_peak_landing_force_n,
+    jump_height_m AS jump_height
+  FROM SJ_cleaned
+  GROUP BY athlete_id, athlete_name, jump_height)
+AS sj ON a.athlete_id = sj.athlete_id
+WHERE cmj.athlete_id IS NOT NULL AND sj.athlete_id IS NOT NULL;
+
+
+
+```
+
+```{r Checking second query}
+head(Left_Right_combined)
+```
+
+
+
+## Query 2: Worst Jumpers
+
+Sometimes its fun to look at the bottom end of the spectrum instead of the top to see what you will find. In this case, most of the worst jumps would be data that wouldn't normally be considered because it may be an outlier due to various factors, and the fact that most people are more inetrested in their best than in their worst.
+
+```{sql connection=con_FP}
+#| output.var: "Worst_jump_df"
+
+(SELECT athlete_name, MIN(flight_time_s) AS worst_flight_time, MIN(peak_velocity_m_s) AS worst_peak_velocity, MIN(jump_height_m) AS lowest_jump_height
+FROM CMJ_cleaned
+GROUP BY athlete_name
+HAVING COUNT(*) > 15)
+UNION
+(SELECT athlete_name, MIN(flight_time_s) AS worst_flight_time, MIN(peak_velocity_m_s) AS worst_peak_velocity, MIN(jump_height_m) AS lowest_jump_height
+FROM SJ_cleaned
+GROUP BY athlete_name
+HAVING COUNT(*) > 15)
+ORDER BY lowest_jump_height;
+```
+
+## Query 3: Top 3 Jumps of the Best Flight Times
+This query takes a look at the top 50 best flight time jumpers and looks at their best top 3 variables. We can look at how different aspects of their jumps affect how there flight time was produced. We had to filter for all jumps below 8.5 because there were several unrealistic outliers.
+
+```{sql connection=con_FP}
+#| output.var: "top_3_jumps_multirebound"
+
+SELECT athlete_name, total_flight_time_s AS flight_time,
+       AVG(top_3_jumps_avg_jump_height_m) AS top_3_jumps_avg_jump_height_m,
+       AVG(top_3_jumps_avg_m_rsi) AS top_3_jumps_avg_m_rsi,
+       AVG(top_3_jumps_peak_rsi) AS top_3_jumps_peak_rsi, 
+       AVG(top_3_jumps_peak_m_rsi) AS top_3_jumps_peak_m_rsi,
+       AVG(top_3_jumps_avg_rsi) AS top_3_jumps_avg_rsi,
+       AVG(top_3_jumps_avg_contact_time_s) AS top_3_jumps_avg_contact_time_s
+FROM MR_cleaned
+GROUP BY athlete_name, flight_time
+HAVING flight_time < 8.5
+ORDER BY flight_time DESC
+LIMIT 50;
+
+```
+
+## Query 4: The Best Jumper
+This query takes a look at the athlete with the highest Counter Movement Jump. We had to filter for jump heights under 1 so that all unrealistic misreads weren't considered.
+
+```{sql connection=con_FP}
+#| output.var: "best_jumper"
+
+SELECT athlete_name, testType_name AS jump_type, MAX(jump_height_m) AS jump_height
+FROM CMJ_cleaned
+WHERE testType_name = 'Countermovement Jump'
+GROUP BY athlete_name, jump_type
+HAVING jump_height < 1
+ORDER BY jump_height DESC
+LIMIT 1;
+
+
+
+```
+
+
+### ---------------------------------------------------------------------------
+
+
+
+# Creating data visualizations
+```{r symmetry viz}
+library(patchwork)
+library(tidyverse)
+library(magick)
+library(cowplot)
+
+# Wrangling: selected for athletes meeting unbalanced threshold and added total imbalance variable
+asymmetry_viz_data <- read.csv("Asymmetry_grading.csv") %>%
+  filter(asymmetry_report %in% c("High risk: Check in","imbalanced: monitor")) %>%
+  filter(athlete_name != "Josh Bootz") %>% #super weird data (misread)
+  mutate(asymmetry_report = recode(asymmetry_report, "High risk: Check in" = "High Risk", 
+                                   "imbalanced: monitor"= "Moderate Risk")) %>%
+  mutate(total_imbalance = avg_propulsive_CMJ_imbalance + avg_braking_CMJ_imbalance) 
+
+kpi_logo_raw <- magick::image_read("kpi_logo.png")
+kpi_logo_plot <- cowplot::ggdraw() + 
+  cowplot::draw_image(kpi_logo_raw, scale = 1)
+
+# Plotting
+asym_plot <- ggplot(asymmetry_viz_data, aes(y = reorder(athlete_name, total_imbalance))) +
+  geom_col(aes(x = -avg_braking_CMJ_imbalance, fill = "Braking Phase"), alpha = 0.8) +
+  geom_col(aes(x = avg_propulsive_CMJ_imbalance, fill = "Propulsive Phase"), alpha = 0.8) +
+  geom_vline(xintercept = 0, color = "white", size = 0.5) + 
+  facet_wrap(~asymmetry_report, scales = "free") + #High and Moderate risk plots
+  scale_x_continuous(limits = c(-30, 30), 
+    breaks = seq(-30, 30, by = 5),
+    labels = abs(seq(-30, 30, by = 5))) +
+scale_fill_manual(values = c("Braking Phase" = "#FF9999", "Propulsive Phase" = "#996699")) +
+  labs(
+    title = "KPI Asymmetry Warning Report",
+    subtitle = "Powered by  2025-2026 CMJ data via the hawkinR package",
+    x = "Imbalance (%)",
+    y = NULL,
+    fill = "Movement Phase:") + 
+theme_minimal(base_size = 11) +
+  theme(
+    plot.background = element_rect(fill = "#003366", color = NA),
+    panel.background = element_rect(fill = "#336699", color = NA),
+    text = element_text(color = "white", family = "serif"),
+    plot.title = element_text(face = "bold", size = 18, color = "#66CCFF"),
+    plot.subtitle = element_text(size = 12, color = "gray80", margin = margin(b = 20)),
+    axis.text = element_text(color = "white", face = "bold"),
+    axis.title.x = element_text(color = "white", face = "bold", size = 12),
+    panel.grid.major.y = element_blank(), 
+    panel.grid.major.x = element_line(color = "#333", linetype = "dashed"),
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = "#1A1A1A"),
+    strip.text = element_text(color = "#66CCFF", face = "bold", size = 12),
+    legend.position = "bottom",
+    legend.box = "horizontal",
+    # This creates the white border 'box' around your legend
+    legend.background = element_rect(fill = "#003366", color = "white", size = 0.5),
+    legend.margin = margin(6, 12, 6, 12),
+    legend.key = element_rect(fill = "#66CCFF", color = NA),
+    legend.text = element_text(size = 11)
+  )
+
+final_viz <- asym_plot + 
+  patchwork::inset_element(
+    kpi_logo_plot, 
+    left = 0.88,   # Distance from left edge (0 to 1)
+    bottom = 0.85, # Distance from bottom edge (0 to 1)
+    right = 1.0,   # Right edge of the page
+    top = 0.97,     # Top edge of the page
+    # --- THIS IS THE KEY ---
+    align_to = 'full', # Allows the logo to move into the title/margin area
+    on_top = TRUE      # Ensures it doesn't get hidden by the background
+  )
+# Display final combined visualization
+final_viz
+  
+
+```
+
+## Data Visualization (Will): Comparing Left and Right leg propulsive force
+The first visualization shows the average propuslive force of the right leg of an athlete compared to the left leg. The second visualization shows the peak propulsive force of the right leg compared tot he left leg. As expected there is a strong correlation between the left and right leg for most athletes. Interestingly, there are several athletes who have both a great left and right leg propulsion, and they sit close tot he top on both, but for some reason they have a lower jump height, which doesn't make too much sense, as you would expect more force to equal more jump height. However, this doesn't take into consideration weight of the athlete when they are jumping, so heavier athletes may produce more force without jumping as high.
+
+```{r}
+library(tidyverse)
+
+ggplot(data = Left_Right_combined) +
+  geom_point(aes(x = sj_right_avg_propulsive_force_n, y = sj_left_avg_propulsive_force_n, color = jump_height), alpha = 0.5) + 
+  labs(title = "Left and Right Leg Average Propulsive Force", 
+       x = "Right Leg AveragePropuslive Force",
+       y = "Left Leg Average Propuslive Force")
+
+ggplot(data = Left_Right_combined) +
+  geom_point(aes(x = sj_right_force_at_peak_propulsive_force_n, y = sj_left_force_at_peak_propulsive_force_n, color = jump_height), alpha = 0.5) + 
+  labs(title = "Left and Right Leg Peak Propulsive Force", 
+       x = "Right Leg Peak Propuslive Force",
+       y = "Left Leg Peak Propuslive Force")
+
+```
+
+
+### ---------------------------------------------------------------------------
+
+# Sources
+
+* https://www.hawkindynamics.com/hawkin-metric-database
+
+* https://www.hawkindynamics.com/blog/select-your-force-time-metrics-with-this-simple-system 
+
+* https://www.sportsmith.co/articles/selecting-the-right-metrics-for-vertical-jump-testing/
+
+* Google Gemini
+
+### ---------------------------------------------------------------------------

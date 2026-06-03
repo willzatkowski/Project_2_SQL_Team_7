@@ -1,0 +1,44 @@
+---
+title: "AI-Collaboration Log: Project 2"
+author: "Will Zatkowski and Nick Katz"
+format: pdf
+---
+
+## Overview
+
+In this course, we will treat AI as a collaborator, not a substitute for thought. This document serves as a log for your collaboration with AI tools (e.g., ChatGPT, Gemini, Claude, etc.) during Project 2. Please be specific in your descriptions. **Failure to document AI usage or representing AI-generated work as entirely your own will be considered an honor code violation.**
+
+
+**Mention the AI tool(s) you used:**
+
+Gemini - Nick Katz
+
+I did not use any AI for this project - Will Zatkowski
+
+## 1. Idea Generation
+
+**Describe how you used AI to brainstorm your topic, find potential datasets, or refine your research questions. What were some typical prompts that you used? How did the AI's output influence your project?**
+
+My first prompt was a general input more so than a question, uploading the csvs, file specs, and my notes from class. I asked for acknowledgement of information and general goal for each peice to be repeated back. No task yet, just a general knowledge dump and refinement session. It gave me the information about tone, meaning, and clarity. Then it began a short list of next steps, including the notes we used in class mainly as examples.
+
+
+## 2. Code Generation (SQL & R)
+
+**Describe how AI assisted in writing, debugging, or optimizing your code. How did you verify and correct AI-generated code? Did the AI provide any incorrect or "hallucinated" code? What did you think were some benefits of AI-assisted coding for this project? What were some challenges?**
+
+AI suggested the athletes table, as it could be useful in crossreferencing queries in the future. I'm not sure if I will even implement it in my queries, but it seemed like a good idea for long term DB development. I used Gemini's logic for the athletes creation.
+
+With the double join queries, I used gemini to help me with the athlete combination section. The double join logic was not working for me, and gemini gave me sub queries as the best solution. After implementation, the parantheses worked and solved my problem. The general workflow was original, but the middle FROM clauses and seperate sub queries were suggest by gemini.  It definitely helped here, but did take 2-3 prompts to get to the core issue I was having. 
+
+I used gemini for the viz in a couple of ways. first, I specified what exactly I wanted; "for the asymmetry grading one, i want to take the unbalanced and high risk athletes and visualize their deffiencies. i want to make these nice, with professional branding (KPI logo within the graph)" or "i want to be professional grade. thinking of a side bar graph with propulsive on one side and braking on the other, faceted by high risk or imblanaced." I uploaded the corresponding dataset to ensure clarity. The response was helpful, although edits were needed to complete the small wrangling and general theme aesthetics. The theme chunk was the most helpful, as it gave me a skeleton for the dynamics of the graph, sizing ideas, and color combinations. 
+
+
+
+
+## 3. Final Reflection
+
+**In separate paragraphs, reflect on (1) how the use of AI changed your learning process for this project, and (2) your overall experience with this project (challenges/achievements/skills you learned, etc.). **
+
+In general, AI was helpful in this project in a variety of ways. It allowed me to understand SQL CASE statements and a general double join. It did influence the learning process, but generally only helped in identifying issues in syntax with creation of tables and workflow of new commands. It was the most helpful with my viz, using patchwork, magick, and cowplot to add an image into the figure. In general I found it useful in workflow creation and slightly in git hub troubleshooting. In pushing and pulling issues, it was not helpful in resolving different requests. That was all troubleshooting and manual input. 
+
+The project was very useful and generally helpful to both my field and background knowledge base. Using multiple data sources, especially with different general terms and variables, is very applicable to the sports performance industry. Between the different systems (force plates, logged data, other tech) the ability to integrate multiple API queries and compile them into a database for further use. I want to eventually use these skills to build some interesting ML models for injury predictability and fatigue management. Again, overall a very helpful and job-relevant project.
